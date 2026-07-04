@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -814,7 +814,12 @@ class TitlePanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 56),
-        PixelButton(label: 'GAME START', large: true, onPressed: onStart),
+        ImageButton(
+          assetPath: 'assets/ui/btn_game_start.png',
+          width: 280,
+          height: 96,
+          onPressed: onStart,
+        ),
         const Spacer(),
         Column(
           children: [
@@ -1086,18 +1091,24 @@ class TouchControls extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FrostControlButton(
-              icon: Icons.rotate_left,
+            ImageButton(
+              assetPath: 'assets/ui/btn_turn_left.png',
+              width: 58,
+              height: 58,
               onPressed: game.rotateLeft,
             ),
             const SizedBox(width: 10),
-            FrostControlButton(
-              icon: Icons.flip,
+            ImageButton(
+              assetPath: 'assets/ui/btn_flip.png',
+              width: 58,
+              height: 58,
               onPressed: game.flipHorizontal,
             ),
             const SizedBox(width: 10),
-            FrostControlButton(
-              icon: Icons.rotate_right,
+            ImageButton(
+              assetPath: 'assets/ui/btn_turn_right.png',
+              width: 58,
+              height: 58,
               onPressed: game.rotate,
             ),
           ],
@@ -1106,18 +1117,24 @@ class TouchControls extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FrostControlButton(
-              icon: Icons.keyboard_arrow_left,
+            ImageButton(
+              assetPath: 'assets/ui/btn_move_left.png',
+              width: 58,
+              height: 58,
               onPressed: () => game.move(-1),
             ),
             const SizedBox(width: 10),
-            FrostControlButton(
-              icon: Icons.keyboard_double_arrow_down,
+            ImageButton(
+              assetPath: 'assets/ui/btn_down.png',
+              width: 58,
+              height: 58,
               onPressed: game.softDrop,
             ),
             const SizedBox(width: 10),
-            FrostControlButton(
-              icon: Icons.keyboard_arrow_right,
+            ImageButton(
+              assetPath: 'assets/ui/btn_move_right.png',
+              width: 58,
+              height: 58,
               onPressed: () => game.move(1),
             ),
           ],
@@ -1127,31 +1144,48 @@ class TouchControls extends StatelessWidget {
   }
 }
 
-class FrostControlButton extends StatelessWidget {
-  const FrostControlButton({
+class ImageButton extends StatefulWidget {
+  const ImageButton({
     super.key,
-    required this.icon,
+    required this.assetPath,
+    required this.width,
+    required this.height,
     required this.onPressed,
   });
 
-  final IconData icon;
+  final String assetPath;
+  final double width;
+  final double height;
   final VoidCallback onPressed;
 
   @override
+  State<ImageButton> createState() => _ImageButtonState();
+}
+
+class _ImageButtonState extends State<ImageButton> {
+  bool pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xff08101d).withValues(alpha: 0.78),
-        border: Border.all(color: const Color(0xffc8efff), width: 1.6),
-        boxShadow: const [BoxShadow(color: Color(0x6600aaff), blurRadius: 9)],
-      ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 29),
-        color: const Color(0xffe7f9ff),
-        style: IconButton.styleFrom(
-          fixedSize: const Size(58, 50),
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => pressed = true),
+      onTapCancel: () => setState(() => pressed = false),
+      onTapUp: (_) {
+        setState(() => pressed = false);
+        widget.onPressed();
+      },
+      child: AnimatedScale(
+        scale: pressed ? 0.94 : 1,
+        duration: const Duration(milliseconds: 70),
+        child: SizedBox(
+          width: widget.width,
+          height: widget.height,
+          child: Image.asset(
+            widget.assetPath,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.none,
+          ),
         ),
       ),
     );
