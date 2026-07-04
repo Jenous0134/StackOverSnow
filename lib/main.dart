@@ -841,7 +841,13 @@ class GamePanel extends StatelessWidget {
         Positioned(
           top: 0,
           right: 0,
-          child: SquareIconButton(icon: Icons.settings, onPressed: onPause),
+          child: ImageButton(
+            assetPath: 'assets/ui/btn_setting.png',
+            fit: BoxFit.fill,
+            width: 48,
+            height: 48,
+            onPressed: onPause,
+          ),
         ),
         Column(
           children: [
@@ -1194,24 +1200,53 @@ class PauseMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      child: Container(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SizedBox(
         width: 300,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/ui/menu_modal.png'),
-            fit: BoxFit.fill,
-            filterQuality: FilterQuality.none,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        height: 178,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            PixelButton(label: 'RESUME', onPressed: onResume),
-            const SizedBox(height: 3),
-            PixelButton(label: 'RESTART', onPressed: onRestart),
-            const SizedBox(height: 3),
-            PixelButton(label: 'HOME', onPressed: onHome),
+            Positioned.fill(
+              child: Image.asset(
+                'assets/ui/menu_modal.png',
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.none,
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: ImageButton(
+                assetPath: 'assets/ui/btn_close_menu.png',
+                fit: BoxFit.fill,
+                width: 36,
+                height: 36,
+                onPressed: onResume,
+              ),
+            ),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ImageButton(
+                    assetPath: 'assets/ui/btn_restart.png',
+                    fit: BoxFit.fill,
+                    width: 156,
+                    height: 46,
+                    onPressed: onRestart,
+                  ),
+                  const SizedBox(height: 10),
+                  ImageButton(
+                    assetPath: 'assets/ui/btn_home.png',
+                    fit: BoxFit.fill,
+                    width: 156,
+                    height: 46,
+                    onPressed: onHome,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
