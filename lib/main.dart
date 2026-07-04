@@ -653,23 +653,9 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
       onKeyEvent: _handleKey,
       child: Scaffold(
         backgroundColor: const Color(0xff050817),
-        bottomNavigationBar: bannerAdReady && bannerAd != null
-            ? SafeArea(
-                child: SizedBox(
-                  height: bannerAd!.size.height.toDouble(),
-                  child: Center(
-                    child: SizedBox(
-                      width: bannerAd!.size.width.toDouble(),
-                      height: bannerAd!.size.height.toDouble(),
-                      child: AdWidget(ad: bannerAd!),
-                    ),
-                  ),
-                ),
-              )
-            : null,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final verticalCell = (constraints.maxHeight - 210) / boardRows;
+            final verticalCell = (constraints.maxHeight - 324) / boardRows;
             final horizontalCell = (constraints.maxWidth - 56) / boardCols;
             final cell = math
                 .min(baseCellSize, math.min(horizontalCell, verticalCell))
@@ -680,12 +666,18 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
                 Positioned.fill(
                   child: SnowNightBackground(time: backgroundTime),
                 ),
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(bottom: false, child: SizedBox(height: 54)),
+                ),
                 SafeArea(
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 980),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 66, 16, 12),
                         child: game.phase == GamePhase.title
                             ? TitlePanel(
                                 bestHeight: game.bestHeight,
@@ -901,7 +893,7 @@ class GamePanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(child: Center(child: board)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             TouchControls(game: game),
           ],
         ),
@@ -952,6 +944,7 @@ class BoardPainter extends CustomPainter {
         ? math.sin(game.scrollPulse * math.pi * 8) * 1.5
         : 0.0;
     canvas.save();
+    canvas.clipRect(boardRect);
     canvas.translate(0, offsetY);
     for (var y = 0; y < boardRows; y += 1) {
       final drop = _dropForRow(y);
@@ -1065,7 +1058,7 @@ class StatusBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.ac_unit, color: Color(0xff8fd7ff), size: 22),
-          const SizedBox(width: 10),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
@@ -1093,48 +1086,54 @@ class TouchControls extends StatelessWidget {
           children: [
             ImageButton(
               assetPath: 'assets/ui/btn_turn_left.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: game.rotateLeft,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 4),
             ImageButton(
               assetPath: 'assets/ui/btn_flip.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: game.flipHorizontal,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 4),
             ImageButton(
               assetPath: 'assets/ui/btn_turn_right.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: game.rotate,
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ImageButton(
               assetPath: 'assets/ui/btn_move_left.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: () => game.move(-1),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 4),
             ImageButton(
               assetPath: 'assets/ui/btn_down.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: game.softDrop,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 4),
             ImageButton(
               assetPath: 'assets/ui/btn_move_right.png',
-              width: 58,
-              height: 58,
+              fit: BoxFit.fill,
+              width: 54,
+              height: 54,
               onPressed: () => game.move(1),
             ),
           ],
@@ -1151,12 +1150,14 @@ class ImageButton extends StatefulWidget {
     required this.width,
     required this.height,
     required this.onPressed,
+    this.fit = BoxFit.contain,
   });
 
   final String assetPath;
   final double width;
   final double height;
   final VoidCallback onPressed;
+  final BoxFit fit;
 
   @override
   State<ImageButton> createState() => _ImageButtonState();
@@ -1183,7 +1184,7 @@ class _ImageButtonState extends State<ImageButton> {
           height: widget.height,
           child: Image.asset(
             widget.assetPath,
-            fit: BoxFit.contain,
+            fit: widget.fit,
             filterQuality: FilterQuality.none,
           ),
         ),
@@ -1213,6 +1214,11 @@ class PauseMenu extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: const Color(0xff080b16).withValues(alpha: 0.96),
+          image: const DecorationImage(
+            image: AssetImage('assets/ui/menu_modal.png'),
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.none,
+          ),
           border: Border.all(color: const Color(0xffd9f1ff), width: 2),
           boxShadow: const [
             BoxShadow(color: Color(0x99000000), blurRadius: 22),
@@ -1232,9 +1238,9 @@ class PauseMenu extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             PixelButton(label: 'RESUME', onPressed: onResume),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             PixelButton(label: 'RESTART', onPressed: onRestart),
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             PixelButton(label: 'HOME', onPressed: onHome),
             const SizedBox(height: 14),
             const Text(
