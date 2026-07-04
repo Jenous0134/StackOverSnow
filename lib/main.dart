@@ -159,7 +159,7 @@ class SnowGameModel {
   double meltTimer = 0;
   double lineFlash = 0;
   double scrollPulse = 0;
-  String status = '한 줄이 완성되면 얼음이 됩니다.';
+  String status = '';
   final List<Particle> particles = [];
   final List<IceLineDrop> iceLineDrops = [];
 
@@ -179,7 +179,7 @@ class SnowGameModel {
     lineFlash = 0;
     scrollPulse = 0;
     particles.clear();
-    status = '한 줄이 완성되면 얼음이 됩니다.';
+    status = '';
   }
 
   void start() {
@@ -679,10 +679,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 66, 16, 12),
                         child: game.phase == GamePhase.title
-                            ? TitlePanel(
-                                bestHeight: game.bestHeight,
-                                onStart: _startGame,
-                              )
+                            ? TitlePanel(onStart: _startGame)
                             : GamePanel(
                                 game: game,
                                 images: images,
@@ -769,13 +766,8 @@ class BackgroundPainter extends CustomPainter {
 }
 
 class TitlePanel extends StatelessWidget {
-  const TitlePanel({
-    super.key,
-    required this.bestHeight,
-    required this.onStart,
-  });
+  const TitlePanel({super.key, required this.onStart});
 
-  final int bestHeight;
   final VoidCallback onStart;
 
   @override
@@ -813,22 +805,6 @@ class TitlePanel extends StatelessWidget {
           onPressed: onStart,
         ),
         const Spacer(),
-        Column(
-          children: [
-            const Text(
-              'BEST ICE LINES',
-              style: TextStyle(color: Color(0xffb7d7ff), fontSize: 13),
-            ),
-            Text(
-              '',
-              style: const TextStyle(
-                color: Color(0xff8fd7ff),
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -1118,6 +1094,7 @@ class TouchControls extends StatelessWidget {
               fit: BoxFit.fill,
               width: 54,
               height: 54,
+              scaleX: 1.52,
               onPressed: () => game.move(-1),
             ),
             const SizedBox(width: 4),
@@ -1151,6 +1128,7 @@ class ImageButton extends StatefulWidget {
     required this.height,
     required this.onPressed,
     this.fit = BoxFit.contain,
+    this.scaleX = 1,
   });
 
   final String assetPath;
@@ -1158,6 +1136,7 @@ class ImageButton extends StatefulWidget {
   final double height;
   final VoidCallback onPressed;
   final BoxFit fit;
+  final double scaleX;
 
   @override
   State<ImageButton> createState() => _ImageButtonState();
@@ -1182,10 +1161,16 @@ class _ImageButtonState extends State<ImageButton> {
         child: SizedBox(
           width: widget.width,
           height: widget.height,
-          child: Image.asset(
-            widget.assetPath,
-            fit: widget.fit,
-            filterQuality: FilterQuality.none,
+          child: ClipRect(
+            child: Transform.scale(
+              scaleX: widget.scaleX,
+              alignment: Alignment.center,
+              child: Image.asset(
+                widget.assetPath,
+                fit: widget.fit,
+                filterQuality: FilterQuality.none,
+              ),
+            ),
           ),
         ),
       ),
@@ -1213,40 +1198,20 @@ class PauseMenu extends StatelessWidget {
         width: 300,
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: const Color(0xff080b16).withValues(alpha: 0.96),
           image: const DecorationImage(
             image: AssetImage('assets/ui/menu_modal.png'),
             fit: BoxFit.fill,
             filterQuality: FilterQuality.none,
           ),
-          border: Border.all(color: const Color(0xffd9f1ff), width: 2),
-          boxShadow: const [
-            BoxShadow(color: Color(0x99000000), blurRadius: 22),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'PAUSED',
-              style: TextStyle(
-                color: Color(0xffe9f8ff),
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 18),
             PixelButton(label: 'RESUME', onPressed: onResume),
             const SizedBox(height: 4),
             PixelButton(label: 'RESTART', onPressed: onRestart),
             const SizedBox(height: 4),
             PixelButton(label: 'HOME', onPressed: onHome),
-            const SizedBox(height: 14),
-            const Text(
-              'Settings will be added here.',
-              style: TextStyle(color: Color(0xff8fa8c8), fontSize: 12),
-            ),
           ],
         ),
       ),

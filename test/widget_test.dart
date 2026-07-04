@@ -12,6 +12,5 @@ void main() {
       find.image(const AssetImage('assets/ui/btn_game_start.png')),
       findsOneWidget,
     );
-    expect(find.text('BEST ICE LINES'), findsOneWidget);
   });
 }
