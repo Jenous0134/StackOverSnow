@@ -227,10 +227,26 @@ class SnowGameModel {
     }
   }
 
+  void rotateLeft() {
+    _rotateWithKicks(
+      (shape) => _rotateShape(_rotateShape(_rotateShape(shape))),
+    );
+  }
+
   void rotate() {
+    _rotateWithKicks(_rotateShape);
+  }
+
+  void flipHorizontal() {
+    _rotateWithKicks(
+      (shape) => shape.map((row) => row.reversed.toList()).toList(),
+    );
+  }
+
+  void _rotateWithKicks(List<List<int>> Function(List<List<int>>) transform) {
     if (phase != GamePhase.playing || current == null) return;
     final piece = current!;
-    final rotated = _rotateShape(piece.shape);
+    final rotated = transform(piece.shape);
     for (final kick in [0, -1, 1, -2, 2]) {
       if (!_collides(piece, piece.x + kick, piece.y, rotated)) {
         piece.x += kick;
@@ -895,17 +911,30 @@ class GamePanel extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: Center(
-            child: wide
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [board, const SizedBox(width: 18), side],
-                  )
-                : Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (!wide) {
+                return Center(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [board, const SizedBox(height: 12), side],
                   ),
+                );
+              }
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(child: board),
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: side,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -1071,7 +1100,7 @@ class SideHud extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 132,
+      width: 150,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1084,15 +1113,13 @@ class SideHud extends StatelessWidget {
                     : Icons.pause,
                 onPressed: onPause,
               ),
-              const SizedBox(width: 8),
-              SquareIconButton(icon: Icons.restart_alt, onPressed: onRestart),
             ],
           ),
           const SizedBox(height: 18),
           HudBox(
             title: 'NEXT',
             child: SizedBox(
-              height: 76,
+              height: 92,
               child: CustomPaint(
                 painter: NextPiecePainter(type: game.nextType, images: images),
               ),
@@ -1113,7 +1140,7 @@ class NextPiecePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final shape = tetrominoes[type]!;
-    final cell = math.min(size.width / 5, size.height / 4);
+    final cell = math.min(size.width / 4.2, size.height / 3.2);
     final totalW = shape.first.length * cell;
     final totalH = shape.length * cell;
     final ox = (size.width - totalW) / 2;
@@ -1130,7 +1157,7 @@ class NextPiecePainter extends CustomPainter {
         if (images != null) {
           paintImage(
             canvas: canvas,
-            rect: rect.inflate(cell * 0.18),
+            rect: rect.inflate(cell * 0.24),
             image: images!.stages.first,
             fit: BoxFit.cover,
             filterQuality: FilterQuality.none,
@@ -1221,25 +1248,80 @@ class TouchControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        SquareIconButton(
-          icon: Icons.keyboard_arrow_left,
-          onPressed: () => game.move(-1),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FrostControlButton(
+              icon: Icons.rotate_left,
+              onPressed: game.rotateLeft,
+            ),
+            const SizedBox(width: 10),
+            FrostControlButton(
+              icon: Icons.flip,
+              onPressed: game.flipHorizontal,
+            ),
+            const SizedBox(width: 10),
+            FrostControlButton(
+              icon: Icons.rotate_right,
+              onPressed: game.rotate,
+            ),
+          ],
         ),
-        SquareIconButton(icon: Icons.rotate_right, onPressed: game.rotate),
-        SquareIconButton(
-          icon: Icons.keyboard_arrow_right,
-          onPressed: () => game.move(1),
-        ),
-        SquareIconButton(
-          icon: Icons.keyboard_arrow_down,
-          onPressed: game.softDrop,
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FrostControlButton(
+              icon: Icons.keyboard_arrow_left,
+              onPressed: () => game.move(-1),
+            ),
+            const SizedBox(width: 10),
+            FrostControlButton(
+              icon: Icons.keyboard_double_arrow_down,
+              onPressed: game.softDrop,
+            ),
+            const SizedBox(width: 10),
+            FrostControlButton(
+              icon: Icons.keyboard_arrow_right,
+              onPressed: () => game.move(1),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class FrostControlButton extends StatelessWidget {
+  const FrostControlButton({
+    super.key,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xff08101d).withValues(alpha: 0.78),
+        border: Border.all(color: const Color(0xffc8efff), width: 1.6),
+        boxShadow: const [BoxShadow(color: Color(0x6600aaff), blurRadius: 9)],
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 29),
+        color: const Color(0xffe7f9ff),
+        style: IconButton.styleFrom(
+          fixedSize: const Size(58, 50),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+      ),
     );
   }
 }
