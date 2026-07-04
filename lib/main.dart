@@ -1206,11 +1206,12 @@ class PauseMenu extends StatelessWidget {
     // Adjust these ratios to tune the pause modal layout.
     final modalWidth = math.min(screen.width * 0.82, 320.0);
     final modalHeight = modalWidth * 0.593;
-    final closeTop = modalHeight * 0.135;
-    final closeRight = modalWidth * 0.047;
+    final closeTop = modalHeight * 0.085;
+    final closeRight = modalWidth * 0.135;
     final closeSize = modalWidth * 0.093;
     final menuButtonWidth = modalWidth * 0.587;
-    final menuButtonHeight = modalHeight * 0.315;
+    final restartButtonHeight = modalHeight * 0.315;
+    final homeButtonHeight = modalHeight * 0.315;
     final menuButtonGap = modalHeight * 0.045;
     const restartScaleY = 2.05;
 
@@ -1249,7 +1250,7 @@ class PauseMenu extends StatelessWidget {
                     assetPath: 'assets/ui/btn_restart.png',
                     fit: BoxFit.fill,
                     width: menuButtonWidth,
-                    height: menuButtonHeight,
+                    height: restartButtonHeight,
                     scaleY: restartScaleY,
                     onPressed: onRestart,
                   ),
@@ -1258,7 +1259,7 @@ class PauseMenu extends StatelessWidget {
                     assetPath: 'assets/ui/btn_home.png',
                     fit: BoxFit.fill,
                     width: menuButtonWidth,
-                    height: menuButtonHeight,
+                    height: homeButtonHeight,
                     onPressed: onHome,
                   ),
                 ],
