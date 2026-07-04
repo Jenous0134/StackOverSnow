@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -669,13 +669,11 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
             : null,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final shortSide = math.min(
-              constraints.maxWidth,
-              constraints.maxHeight,
-            );
+            final verticalCell = (constraints.maxHeight - 210) / boardRows;
+            final horizontalCell = (constraints.maxWidth - 56) / boardCols;
             final cell = math
-                .min(baseCellSize, (shortSide - 64) / boardCols)
-                .clamp(18.0, 32.0);
+                .min(baseCellSize, math.min(horizontalCell, verticalCell))
+                .clamp(14.0, 32.0);
             final boardSize = Size(cell * boardCols, cell * boardRows);
             return Stack(
               children: [
@@ -699,7 +697,6 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
                                 boardSize: boardSize,
                                 cell: cell,
                                 onPause: () => unawaited(_openPauseMenu()),
-                                onRestart: _startGame,
                               ),
                       ),
                     ),
@@ -721,7 +718,19 @@ class SnowNightBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(painter: BackgroundPainter(time));
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/ui/background.png',
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (context, error, stackTrace) =>
+              const ColoredBox(color: Color(0xff02030a)),
+        ),
+        CustomPaint(painter: BackgroundPainter(time)),
+      ],
+    );
   }
 }
 
@@ -733,15 +742,6 @@ class BackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint();
-    final sky = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [Color(0xff02030a), Color(0xff050817), Color(0xff090c18)],
-    );
-    paint.shader = sky.createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, paint);
-    paint.shader = null;
-
     final starPaint = Paint()..color = Colors.white.withValues(alpha: 0.72);
     for (var i = 0; i < 70; i += 1) {
       final x = ((i * 137) % 997) / 997 * size.width;
@@ -755,13 +755,14 @@ class BackgroundPainter extends CustomPainter {
 
     for (var i = 0; i < 150; i += 1) {
       final lane = ((i * 67) % 1000) / 1000;
-      final drift = math.sin(time * 0.55 + i) * 7;
-      final speed = 16 + (i % 7) * 8;
+      final drift =
+          math.sin(time * (0.45 + (i % 5) * 0.08) + i * 1.7) * (8 + (i % 4));
+      final speed = 22 + (i % 8) * 9;
       final x = (lane * size.width + drift) % size.width;
       final y = ((i * 113) % 1000) / 1000 * size.height + (time * speed);
       final wrappedY = y % size.height;
-      final side = i % 5 == 0 ? 3.0 : 2.0;
-      final alpha = 0.35 + (i % 4) * 0.12;
+      final side = i % 6 == 0 ? 3.0 : 2.0;
+      final alpha = 0.42 + (i % 4) * 0.1;
       paint.color = Colors.white.withValues(alpha: alpha);
       canvas.drawRect(
         Rect.fromLTWH(x.floorToDouble(), wrappedY.floorToDouble(), side, side),
@@ -815,33 +816,20 @@ class TitlePanel extends StatelessWidget {
         const SizedBox(height: 56),
         PixelButton(label: 'GAME START', large: true, onPressed: onStart),
         const Spacer(),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Column(
           children: [
-            Row(
-              children: [
-                SquareIconButton(icon: Icons.settings, onPressed: () {}),
-                const SizedBox(width: 10),
-                SquareIconButton(icon: Icons.music_note, onPressed: () {}),
-              ],
+            const Text(
+              'BEST ICE LINES',
+              style: TextStyle(color: Color(0xffb7d7ff), fontSize: 13),
             ),
-            Column(
-              children: [
-                const Text(
-                  'BEST ICE LINES',
-                  style: TextStyle(color: Color(0xffb7d7ff), fontSize: 13),
-                ),
-                Text(
-                  '$bestHeight',
-                  style: const TextStyle(
-                    color: Color(0xff8fd7ff),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            Text(
+              '',
+              style: const TextStyle(
+                color: Color(0xff8fd7ff),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            SquareIconButton(icon: Icons.emoji_events, onPressed: () {}),
           ],
         ),
       ],
@@ -857,7 +845,6 @@ class GamePanel extends StatelessWidget {
     required this.boardSize,
     required this.cell,
     required this.onPause,
-    required this.onRestart,
   });
 
   final SnowGameModel game;
@@ -865,11 +852,9 @@ class GamePanel extends StatelessWidget {
   final Size boardSize;
   final double cell;
   final VoidCallback onPause;
-  final VoidCallback onRestart;
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 760;
     final board = SizedBox(
       width: boardSize.width,
       height: boardSize.height,
@@ -878,67 +863,43 @@ class GamePanel extends StatelessWidget {
       ),
     );
 
-    final side = SideHud(
-      game: game,
-      images: images,
-      cell: cell,
-      onPause: onPause,
-      onRestart: onRestart,
-    );
-    return Column(
+    return Stack(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Positioned(
+          top: 0,
+          right: 0,
+          child: SquareIconButton(icon: Icons.settings, onPressed: onPause),
+        ),
+        Column(
           children: [
-            const Text(
-              'ICE LINES',
-              style: TextStyle(
-                color: Color(0xffe6f4ff),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'ICE LINES',
+                  style: TextStyle(
+                    color: Color(0xffe6f4ff),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${game.iceLines}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(
-              '${game.iceLines}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
+            const SizedBox(height: 8),
+            Expanded(child: Center(child: board)),
+            const SizedBox(height: 10),
+            TouchControls(game: game),
           ],
         ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              if (!wide) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [board, const SizedBox(height: 12), side],
-                  ),
-                );
-              }
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Center(child: board),
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: side,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-        TouchControls(game: game),
       ],
     );
   }
@@ -1079,135 +1040,6 @@ class BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BoardPainter oldDelegate) => true;
-}
-
-class SideHud extends StatelessWidget {
-  const SideHud({
-    super.key,
-    required this.game,
-    required this.images,
-    required this.cell,
-    required this.onPause,
-    required this.onRestart,
-  });
-
-  final SnowGameModel game;
-  final CubeImages? images;
-  final double cell;
-  final VoidCallback onPause;
-  final VoidCallback onRestart;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 150,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              SquareIconButton(
-                icon: game.phase == GamePhase.paused
-                    ? Icons.play_arrow
-                    : Icons.pause,
-                onPressed: onPause,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          HudBox(
-            title: 'NEXT',
-            child: SizedBox(
-              height: 92,
-              child: CustomPaint(
-                painter: NextPiecePainter(type: game.nextType, images: images),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class NextPiecePainter extends CustomPainter {
-  NextPiecePainter({required this.type, required this.images});
-
-  final String type;
-  final CubeImages? images;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final shape = tetrominoes[type]!;
-    final cell = math.min(size.width / 4.2, size.height / 3.2);
-    final totalW = shape.first.length * cell;
-    final totalH = shape.length * cell;
-    final ox = (size.width - totalW) / 2;
-    final oy = (size.height - totalH) / 2;
-    final fill = Paint()..color = const Color(0xff61c7ff);
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = const Color(0xff102544);
-    for (var y = 0; y < shape.length; y += 1) {
-      for (var x = 0; x < shape[y].length; x += 1) {
-        if (shape[y][x] == 0) continue;
-        final rect = Rect.fromLTWH(ox + x * cell, oy + y * cell, cell, cell);
-        if (images != null) {
-          paintImage(
-            canvas: canvas,
-            rect: rect.inflate(cell * 0.24),
-            image: images!.stages.first,
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.none,
-          );
-        } else {
-          canvas.drawRect(rect, fill);
-          canvas.drawRect(rect, stroke);
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant NextPiecePainter oldDelegate) =>
-      oldDelegate.type != type || oldDelegate.images != images;
-}
-
-class HudBox extends StatelessWidget {
-  const HudBox({super.key, required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xff101837).withValues(alpha: 0.72),
-        border: Border.all(color: const Color(0xff6d82c4), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
 }
 
 class StatusBar extends StatelessWidget {
