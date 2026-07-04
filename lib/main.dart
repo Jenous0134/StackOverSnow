@@ -1206,13 +1206,15 @@ class PauseMenu extends StatelessWidget {
     // Adjust these ratios to tune the pause modal layout.
     final modalWidth = math.min(screen.width * 0.82, 320.0);
     final modalHeight = modalWidth * 0.593;
-    final closeTop = modalHeight * 0.085;
+    final closeTop = modalHeight * 0.230;
     final closeRight = modalWidth * 0.135;
     final closeSize = modalWidth * 0.093;
     final menuButtonWidth = modalWidth * 0.587;
-    final restartButtonHeight = modalHeight * 0.315;
-    final homeButtonHeight = modalHeight * 0.315;
-    final menuButtonGap = modalHeight * 0.045;
+    final restartButtonHeight = modalHeight * 0.25;
+    final homeButtonHeight = modalHeight * 0.43;
+    final menuButtonLeft = (modalWidth - menuButtonWidth) / 2;
+    final restartTop = modalHeight * 0.26;
+    final homeTop = modalHeight * 0.58;
     const restartScaleY = 2.05;
 
     return Dialog(
@@ -1242,27 +1244,27 @@ class PauseMenu extends StatelessWidget {
                 onPressed: onResume,
               ),
             ),
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ImageButton(
-                    assetPath: 'assets/ui/btn_restart.png',
-                    fit: BoxFit.fill,
-                    width: menuButtonWidth,
-                    height: restartButtonHeight,
-                    scaleY: restartScaleY,
-                    onPressed: onRestart,
-                  ),
-                  SizedBox(height: menuButtonGap),
-                  ImageButton(
-                    assetPath: 'assets/ui/btn_home.png',
-                    fit: BoxFit.fill,
-                    width: menuButtonWidth,
-                    height: homeButtonHeight,
-                    onPressed: onHome,
-                  ),
-                ],
+            Positioned(
+              left: menuButtonLeft,
+              top: restartTop,
+              child: ImageButton(
+                assetPath: 'assets/ui/btn_restart.png',
+                fit: BoxFit.fill,
+                width: menuButtonWidth,
+                height: restartButtonHeight,
+                scaleY: restartScaleY,
+                onPressed: onRestart,
+              ),
+            ),
+            Positioned(
+              left: menuButtonLeft,
+              top: homeTop,
+              child: ImageButton(
+                assetPath: 'assets/ui/btn_home.png',
+                fit: BoxFit.fill,
+                width: menuButtonWidth,
+                height: homeButtonHeight,
+                onPressed: onHome,
               ),
             ),
           ],
