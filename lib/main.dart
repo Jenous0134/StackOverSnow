@@ -849,7 +849,7 @@ class GamePanel extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  'ICE LINES',
+                  '\uC5BC\uC74C',
                   style: TextStyle(
                     color: Color(0xffe6f4ff),
                     fontSize: 16,
@@ -869,7 +869,7 @@ class GamePanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(child: Center(child: board)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             TouchControls(game: game),
           ],
         ),
@@ -1034,7 +1034,7 @@ class StatusBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.ac_unit, color: Color(0xff8fd7ff), size: 22),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Flexible(
             child: Text(
               text,
@@ -1063,54 +1063,54 @@ class TouchControls extends StatelessWidget {
             ImageButton(
               assetPath: 'assets/ui/btn_turn_left.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               onPressed: game.rotateLeft,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             ImageButton(
               assetPath: 'assets/ui/btn_flip.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               onPressed: game.flipHorizontal,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             ImageButton(
               assetPath: 'assets/ui/btn_turn_right.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               onPressed: game.rotate,
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ImageButton(
               assetPath: 'assets/ui/btn_move_left.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
-              scaleX: 1.52,
+              width: 48,
+              height: 48,
+              scaleX: 1.50,
               onPressed: () => game.move(-1),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             ImageButton(
               assetPath: 'assets/ui/btn_down.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               onPressed: game.softDrop,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             ImageButton(
               assetPath: 'assets/ui/btn_move_right.png',
               fit: BoxFit.fill,
-              width: 54,
-              height: 54,
+              width: 48,
+              height: 48,
               onPressed: () => game.move(1),
             ),
           ],
@@ -1208,9 +1208,9 @@ class PauseMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             PixelButton(label: 'RESUME', onPressed: onResume),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             PixelButton(label: 'RESTART', onPressed: onRestart),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             PixelButton(label: 'HOME', onPressed: onHome),
           ],
         ),
@@ -1233,26 +1233,26 @@ class PixelButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final buttonSize = large ? const Size(250, 76) : const Size(104, 36);
     return TextButton(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: const Color(0xff142347),
-        backgroundColor: const Color(0xffcae9ff),
-        padding: EdgeInsets.symmetric(
-          horizontal: large ? 44 : 18,
-          vertical: large ? 18 : 12,
-        ),
+        foregroundColor: const Color(0xff0b1c3e),
+        backgroundColor: const Color(0xffd8f2ff),
+        fixedSize: buttonSize,
+        minimumSize: buttonSize,
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-        side: const BorderSide(color: Color(0xff6576a8), width: 3),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: large ? 26 : 15,
+        side: const BorderSide(color: Color(0xff52699c), width: 2),
+        textStyle: TextStyle(
+          fontSize: large ? 24 : 14,
           fontWeight: FontWeight.w900,
-          letterSpacing: 1,
+          letterSpacing: 0.8,
+          fontFamily: 'monospace',
         ),
       ),
+      child: Text(label),
     );
   }
 }
