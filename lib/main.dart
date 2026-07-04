@@ -1135,6 +1135,7 @@ class ImageButton extends StatefulWidget {
     required this.onPressed,
     this.fit = BoxFit.contain,
     this.scaleX = 1,
+    this.scaleY = 1,
   });
 
   final String assetPath;
@@ -1143,6 +1144,7 @@ class ImageButton extends StatefulWidget {
   final VoidCallback onPressed;
   final BoxFit fit;
   final double scaleX;
+  final double scaleY;
 
   @override
   State<ImageButton> createState() => _ImageButtonState();
@@ -1170,6 +1172,7 @@ class _ImageButtonState extends State<ImageButton> {
           child: ClipRect(
             child: Transform.scale(
               scaleX: widget.scaleX,
+              scaleY: widget.scaleY,
               alignment: Alignment.center,
               child: Image.asset(
                 widget.assetPath,
@@ -1215,13 +1218,13 @@ class PauseMenu extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 10,
-              right: 10,
+              top: 24,
+              right: 14,
               child: ImageButton(
                 assetPath: 'assets/ui/btn_close_menu.png',
                 fit: BoxFit.fill,
-                width: 36,
-                height: 36,
+                width: 28,
+                height: 28,
                 onPressed: onResume,
               ),
             ),
@@ -1232,16 +1235,17 @@ class PauseMenu extends StatelessWidget {
                   ImageButton(
                     assetPath: 'assets/ui/btn_restart.png',
                     fit: BoxFit.fill,
-                    width: 156,
-                    height: 46,
+                    width: 176,
+                    height: 56,
+                    scaleY: 2.05,
                     onPressed: onRestart,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   ImageButton(
                     assetPath: 'assets/ui/btn_home.png',
                     fit: BoxFit.fill,
-                    width: 156,
-                    height: 46,
+                    width: 176,
+                    height: 56,
                     onPressed: onHome,
                   ),
                 ],
