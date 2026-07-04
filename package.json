@@ -1,0 +1,11 @@
+﻿{
+  "name": "snowcube",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "build": "flutter build web",
+    "analyze": "flutter analyze",
+    "test": "flutter test"
+  }
+}
