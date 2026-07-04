@@ -1201,12 +1201,25 @@ class PauseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+
+    // Adjust these ratios to tune the pause modal layout.
+    final modalWidth = math.min(screen.width * 0.82, 320.0);
+    final modalHeight = modalWidth * 0.593;
+    final closeTop = modalHeight * 0.135;
+    final closeRight = modalWidth * 0.047;
+    final closeSize = modalWidth * 0.093;
+    final menuButtonWidth = modalWidth * 0.587;
+    final menuButtonHeight = modalHeight * 0.315;
+    final menuButtonGap = modalHeight * 0.045;
+    const restartScaleY = 2.05;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
       child: SizedBox(
-        width: 300,
-        height: 178,
+        width: modalWidth,
+        height: modalHeight,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -1218,13 +1231,13 @@ class PauseMenu extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: 24,
-              right: 14,
+              top: closeTop,
+              right: closeRight,
               child: ImageButton(
                 assetPath: 'assets/ui/btn_close_menu.png',
                 fit: BoxFit.fill,
-                width: 28,
-                height: 28,
+                width: closeSize,
+                height: closeSize,
                 onPressed: onResume,
               ),
             ),
@@ -1235,17 +1248,17 @@ class PauseMenu extends StatelessWidget {
                   ImageButton(
                     assetPath: 'assets/ui/btn_restart.png',
                     fit: BoxFit.fill,
-                    width: 176,
-                    height: 56,
-                    scaleY: 2.05,
+                    width: menuButtonWidth,
+                    height: menuButtonHeight,
+                    scaleY: restartScaleY,
                     onPressed: onRestart,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: menuButtonGap),
                   ImageButton(
                     assetPath: 'assets/ui/btn_home.png',
                     fit: BoxFit.fill,
-                    width: 176,
-                    height: 56,
+                    width: menuButtonWidth,
+                    height: menuButtonHeight,
                     onPressed: onHome,
                   ),
                 ],
