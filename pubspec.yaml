@@ -1,4 +1,4 @@
-name: snowcube
+﻿name: snowcube
 description: "Stack Over Snow playable prototype."
 publish_to: 'none'
 version: 0.1.0+1
@@ -7,6 +7,7 @@ environment:
   sdk: ^3.12.2
 
 dependencies:
+  audioplayers: ^6.8.1
   flutter:
     sdk: flutter
   google_mobile_ads: ^9.0.0
@@ -27,4 +28,8 @@ flutter:
     - assets/cubes/cube_crack_4.png
     - assets/cubes/cube_frozen.png
     - assets/ui/
+    - assets/bgm/
+    - assets/audio/
+
+
 

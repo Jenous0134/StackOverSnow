@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'audio_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,8 @@ const String bestIceLinesKey = 'best_ice_lines';
 
 const int boardCols = 10;
 const int boardRows = 20;
+const int retainedBaseIceRows = 2;
+const double baseIceVisualDropRows = 0;
 const double baseCellSize = 30;
 const double stageSeconds = 5.5;
 
@@ -179,6 +182,7 @@ class SnowGameModel {
     lineFlash = 0;
     scrollPulse = 0;
     particles.clear();
+    iceLineDrops.clear();
     status = '';
   }
 
@@ -330,6 +334,7 @@ class SnowGameModel {
     }
     if (removed) {
       _settleUnsupportedIceLines();
+      _trimAnchoredIceStack();
       status = '';
     }
   }
@@ -374,6 +379,37 @@ class SnowGameModel {
 
   bool _isEmptyRow(int y) => board[y].every((cell) => cell == null);
 
+  int? get anchoredIceTopRow {
+    int? top;
+    for (var y = boardRows - 1; y >= 0; y -= 1) {
+      if (!_isFullIceRow(y)) break;
+      top = y;
+    }
+    return top;
+  }
+
+  int get anchoredIceHeight {
+    final top = anchoredIceTopRow;
+    if (top == null) return 0;
+    return boardRows - top;
+  }
+
+  void _trimAnchoredIceStack() {
+    final overflowRows = anchoredIceHeight - retainedBaseIceRows;
+    if (overflowRows <= 0) return;
+
+    for (var i = 0; i < overflowRows; i += 1) {
+      board.removeAt(boardRows - 1);
+      board.insert(0, List<CubeCell?>.filled(boardCols, null));
+    }
+    final piece = current;
+    if (piece != null) {
+      piece.y += overflowRows;
+    }
+    iceLineDrops.clear();
+    scrollPulse = 0.5;
+  }
+
   bool _currentOccupiesRow(int row) {
     final piece = current;
     if (piece == null) return false;
@@ -406,6 +442,7 @@ class SnowGameModel {
       lineFlash = 0.55;
       scrollPulse = 0.5;
       final dropped = _settleUnsupportedIceLines();
+      _trimAnchoredIceStack();
       if (dropped > 0) {
         status = '';
       } else {
@@ -490,9 +527,23 @@ class SnowCubeScreen extends StatefulWidget {
   State<SnowCubeScreen> createState() => _SnowCubeScreenState();
 }
 
+class SfxScope extends InheritedWidget {
+  const SfxScope({super.key, required this.playClick, required super.child});
+
+  final VoidCallback playClick;
+
+  static SfxScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<SfxScope>();
+  }
+
+  @override
+  bool updateShouldNotify(covariant SfxScope oldWidget) => false;
+}
+
 class _SnowCubeScreenState extends State<SnowCubeScreen> {
   final SnowGameModel game = SnowGameModel();
   final FocusNode focusNode = FocusNode();
+  final GameAudioController audio = GameAudioController();
   Timer? timer;
   CubeImages? images;
   BannerAd? bannerAd;
@@ -500,6 +551,8 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
   int savedBestIceLines = 0;
   DateTime lastTick = DateTime.now();
   double backgroundTime = 0;
+  int lastPlayedPieces = 0;
+  int lastPlayedIceLines = 0;
 
   @override
   void initState() {
@@ -514,6 +567,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
   void dispose() {
     timer?.cancel();
     bannerAd?.dispose();
+    unawaited(audio.dispose());
     focusNode.dispose();
     super.dispose();
   }
@@ -583,18 +637,46 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
     final frameDt = dt.clamp(0, 0.05).toDouble();
     backgroundTime += frameDt;
     game.update(frameDt);
+    if (game.pieces > lastPlayedPieces) {
+      lastPlayedPieces = game.pieces;
+      _playLandSfx();
+    }
+    if (game.iceLines > lastPlayedIceLines) {
+      lastPlayedIceLines = game.iceLines;
+      _playFreezeSfx();
+    }
     unawaited(_saveBestScoreIfNeeded());
     if (mounted) setState(() {});
   }
 
+  void _playClickSfx() {
+    audio.playClick();
+  }
+
+  void _playLandSfx() {
+    audio.playLand();
+  }
+
+  void _playFreezeSfx() {
+    audio.playFreeze();
+  }
+
+  Future<void> _restartBgm() => audio.restartBgm();
+
   void _startGame() {
+    unawaited(_restartBgm());
     focusNode.requestFocus();
-    setState(game.start);
+    setState(() {
+      game.start();
+      lastPlayedPieces = game.pieces;
+      lastPlayedIceLines = game.iceLines;
+    });
   }
 
   Future<void> _openPauseMenu() async {
     if (game.phase == GamePhase.playing) {
       setState(game.togglePause);
+      unawaited(audio.pauseBgm());
     }
     await showDialog<void>(
       context: context,
@@ -604,6 +686,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
           Navigator.of(context).pop();
           if (game.phase == GamePhase.paused) {
             setState(game.togglePause);
+            unawaited(audio.resumeBgm());
           }
         },
         onRestart: () {
@@ -612,6 +695,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
         },
         onHome: () {
           Navigator.of(context).pop();
+          unawaited(audio.stopBgm());
           setState(() {
             game.phase = GamePhase.title;
             game.current = null;
@@ -647,53 +731,56 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKey,
-      child: Scaffold(
-        backgroundColor: const Color(0xff050817),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final verticalCell = (constraints.maxHeight - 324) / boardRows;
-            final horizontalCell = (constraints.maxWidth - 56) / boardCols;
-            final cell = math
-                .min(baseCellSize, math.min(horizontalCell, verticalCell))
-                .clamp(14.0, 32.0);
-            final boardSize = Size(cell * boardCols, cell * boardRows);
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: SnowNightBackground(time: backgroundTime),
-                ),
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(bottom: false, child: SizedBox(height: 54)),
-                ),
-                SafeArea(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 980),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 66, 16, 12),
-                        child: game.phase == GamePhase.title
-                            ? TitlePanel(onStart: _startGame)
-                            : GamePanel(
-                                game: game,
-                                images: images,
-                                boardSize: boardSize,
-                                cell: cell,
-                                onPause: () => unawaited(_openPauseMenu()),
-                              ),
+    return SfxScope(
+      playClick: _playClickSfx,
+      child: KeyboardListener(
+        focusNode: focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKey,
+        child: Scaffold(
+          backgroundColor: const Color(0xff050817),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final verticalCell = (constraints.maxHeight - 324) / boardRows;
+              final horizontalCell = (constraints.maxWidth - 56) / boardCols;
+              final cell = math
+                  .min(baseCellSize, math.min(horizontalCell, verticalCell))
+                  .clamp(14.0, 32.0);
+              final boardSize = Size(cell * boardCols, cell * boardRows);
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: SnowNightBackground(time: backgroundTime),
+                  ),
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: SafeArea(bottom: false, child: SizedBox(height: 54)),
+                  ),
+                  SafeArea(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 980),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 66, 16, 12),
+                          child: game.phase == GamePhase.title
+                              ? TitlePanel(onStart: _startGame)
+                              : GamePanel(
+                                  game: game,
+                                  images: images,
+                                  boardSize: boardSize,
+                                  cell: cell,
+                                  onPause: () => unawaited(_openPauseMenu()),
+                                ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -772,6 +859,11 @@ class TitlePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Adjust these values to tune the title start button.
+    const startButtonWidth = 280.0;
+    const startButtonHeight = 96.0;
+    const startButtonTopGap = 56.0;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -797,11 +889,11 @@ class TitlePanel extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 56),
+        const SizedBox(height: startButtonTopGap),
         ImageButton(
           assetPath: 'assets/ui/btn_game_start.png',
-          width: 280,
-          height: 96,
+          width: startButtonWidth,
+          height: startButtonHeight,
           onPressed: onStart,
         ),
         const Spacer(),
@@ -836,16 +928,28 @@ class GamePanel extends StatelessWidget {
       ),
     );
 
+    // Adjust these values to tune the in-game settings/control layout.
+    const settingsButtonTop = 0.0;
+    const settingsButtonRight = 0.0;
+    const settingsButtonSize = 48.0;
+    const controlsBoardGap = 3.0;
+    const controlsOffsetX = 0.0;
+    const controlsOffsetY = 5.0;
+    const iceLabelFontSize = 16.0;
+    const iceScoreFontSize = 36.0;
+    const iceLabelScoreGap = 12.0;
+    const iceHeaderBottomGap = 8.0;
+
     return Stack(
       children: [
         Positioned(
-          top: 0,
-          right: 0,
+          top: settingsButtonTop,
+          right: settingsButtonRight,
           child: ImageButton(
             assetPath: 'assets/ui/btn_setting.png',
             fit: BoxFit.fill,
-            width: 48,
-            height: 48,
+            width: settingsButtonSize,
+            height: settingsButtonSize,
             onPressed: onPause,
           ),
         ),
@@ -858,25 +962,28 @@ class GamePanel extends StatelessWidget {
                   '\uC5BC\uC74C',
                   style: TextStyle(
                     color: Color(0xffe6f4ff),
-                    fontSize: 16,
+                    fontSize: iceLabelFontSize,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: iceLabelScoreGap),
                 Text(
                   '${game.iceLines}',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 36,
+                    fontSize: iceScoreFontSize,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: iceHeaderBottomGap),
             Expanded(child: Center(child: board)),
-            const SizedBox(height: 3),
-            TouchControls(game: game),
+            const SizedBox(height: controlsBoardGap),
+            Transform.translate(
+              offset: const Offset(controlsOffsetX, controlsOffsetY),
+              child: TouchControls(game: game),
+            ),
           ],
         ),
       ],
@@ -930,7 +1037,10 @@ class BoardPainter extends CustomPainter {
     canvas.translate(0, offsetY);
     for (var y = 0; y < boardRows; y += 1) {
       final drop = _dropForRow(y);
-      final visualY = y.toDouble() + (drop?.currentOffsetRows ?? 0);
+      final visualY =
+          y.toDouble() +
+          (drop?.currentOffsetRows ?? 0) +
+          _baseIceOffsetForRow(y);
       for (var x = 0; x < boardCols; x += 1) {
         final cellData = game.board[y][x];
         if (cellData == null) continue;
@@ -982,6 +1092,15 @@ class BoardPainter extends CustomPainter {
         ),
       );
     }
+  }
+
+  double _baseIceOffsetForRow(int row) {
+    final anchoredTop = game.anchoredIceTopRow;
+    if (anchoredTop == null || game.anchoredIceHeight < retainedBaseIceRows) {
+      return 0;
+    }
+    if (row < anchoredTop) return 0;
+    return baseIceVisualDropRows;
   }
 
   IceLineDrop? _dropForRow(int row) {
@@ -1060,6 +1179,12 @@ class TouchControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Adjust these values to tune the touch control buttons.
+    const controlButtonSize = 80.0;
+    const controlButtonGap = 0.5;
+    const controlRowGap = 0.5;
+    const moveLeftScaleX = 1.50;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1069,54 +1194,54 @@ class TouchControls extends StatelessWidget {
             ImageButton(
               assetPath: 'assets/ui/btn_turn_left.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
+              width: controlButtonSize,
+              height: controlButtonSize,
               onPressed: game.rotateLeft,
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: controlButtonGap),
             ImageButton(
               assetPath: 'assets/ui/btn_flip.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
+              width: controlButtonSize,
+              height: controlButtonSize,
               onPressed: game.flipHorizontal,
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: controlButtonGap),
             ImageButton(
               assetPath: 'assets/ui/btn_turn_right.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
+              width: controlButtonSize,
+              height: controlButtonSize,
               onPressed: game.rotate,
             ),
           ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: controlRowGap),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ImageButton(
               assetPath: 'assets/ui/btn_move_left.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
-              scaleX: 1.50,
+              width: controlButtonSize,
+              height: controlButtonSize,
+              scaleX: moveLeftScaleX,
               onPressed: () => game.move(-1),
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: controlButtonGap),
             ImageButton(
               assetPath: 'assets/ui/btn_down.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
+              width: controlButtonSize,
+              height: controlButtonSize,
               onPressed: game.softDrop,
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: controlButtonGap),
             ImageButton(
               assetPath: 'assets/ui/btn_move_right.png',
               fit: BoxFit.fill,
-              width: 48,
-              height: 48,
+              width: controlButtonSize,
+              height: controlButtonSize,
               onPressed: () => game.move(1),
             ),
           ],
@@ -1161,6 +1286,7 @@ class _ImageButtonState extends State<ImageButton> {
       onTapCancel: () => setState(() => pressed = false),
       onTapUp: (_) {
         setState(() => pressed = false);
+        SfxScope.maybeOf(context)?.playClick();
         widget.onPressed();
       },
       child: AnimatedScale(
@@ -1209,12 +1335,14 @@ class PauseMenu extends StatelessWidget {
     final closeTop = modalHeight * 0.230;
     final closeRight = modalWidth * 0.135;
     final closeSize = modalWidth * 0.093;
-    final menuButtonWidth = modalWidth * 0.587;
+    final restartButtonWidth = modalWidth * 0.48;
+    final homeButtonWidth = modalWidth * 0.587;
     final restartButtonHeight = modalHeight * 0.25;
-    final homeButtonHeight = modalHeight * 0.43;
-    final menuButtonLeft = (modalWidth - menuButtonWidth) / 2;
-    final restartTop = modalHeight * 0.26;
-    final homeTop = modalHeight * 0.58;
+    final homeButtonHeight = modalHeight * 0.7;
+    final restartButtonLeft = (modalWidth - restartButtonWidth) / 2;
+    final homeButtonLeft = (modalWidth - homeButtonWidth) / 2;
+    final restartTop = modalHeight * 0.3;
+    final homeTop = modalHeight * 0.3;
     const restartScaleY = 2.05;
 
     return Dialog(
@@ -1245,24 +1373,24 @@ class PauseMenu extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: menuButtonLeft,
+              left: restartButtonLeft,
               top: restartTop,
               child: ImageButton(
                 assetPath: 'assets/ui/btn_restart.png',
                 fit: BoxFit.fill,
-                width: menuButtonWidth,
+                width: restartButtonWidth,
                 height: restartButtonHeight,
                 scaleY: restartScaleY,
                 onPressed: onRestart,
               ),
             ),
             Positioned(
-              left: menuButtonLeft,
+              left: homeButtonLeft,
               top: homeTop,
               child: ImageButton(
                 assetPath: 'assets/ui/btn_home.png',
                 fit: BoxFit.fill,
-                width: menuButtonWidth,
+                width: homeButtonWidth,
                 height: homeButtonHeight,
                 onPressed: onHome,
               ),
