@@ -1,17 +1,38 @@
-# snowcube
+﻿# Stack Over Snow
 
-A new Flutter project.
+눈 블록으로 가로 한 줄을 완성해 녹지 않는 얼음을 쌓는 Flutter 퍼즐 게임입니다.
+눈은 5.5초마다 갈라지고 27.5초 후 사라집니다. 바닥에 연결된 얼음은 두 줄만 남기고 보드를 내려 공간을 확보하며, 완성한 줄 수는 계속 기록됩니다.
 
-## Getting Started
+## 실행 및 검증
 
-This project is a starting point for a Flutter application.
+```sh
+flutter pub get
+flutter run
+flutter analyze
+flutter test
+flutter build apk --debug
+```
 
-A few resources to get you started if this is your first Flutter project:
+## 조작
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- 이동: 좌우 화살표 / A, D
+- 회전: 위 화살표 / W, 반대 회전: Z
+- 좌우 뒤집기: X
+- 한 칸 내리기: 아래 화살표 / S
+- 즉시 놓기: Space 또는 화면 버튼
+- 일시정지: Escape / P 또는 설정 버튼
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+터치 조작도 지원합니다. 다음 블록과 착지 윤곽을 확인하며 배치하세요. 블록은 일곱 종류를 한 묶음으로 섞어 공급합니다. 앱 전환 시 자동으로 일시정지하고, 돌아온 뒤 계속하기를 눌러 재개합니다.
+
+## 개선 및 복구 기준
+
+작업 전 상태: `0c3519b`, 원격 태그 `backup/pre-improvements-20260906`.
+이 상태를 별도 폴더에서 확인하려면 다음 명령을 사용합니다.
+
+```sh
+git worktree add ../snowcube-before backup/pre-improvements-20260906
+```
+
+이번 변경은 기존 아트와 눈/얼음 규칙을 유지하면서 메뉴 버튼 겹침, 앱 전환 중 진행, 이미지 비동기 로딩 종료 처리를 수정했습니다. 규칙 안내, 다음 블록, 착지 가이드, 즉시 놓기, 최고 기록/다음 목표 및 결과 화면의 재도전을 추가했습니다.
+
+사용자 확보 효과는 아직 측정되지 않았습니다. 실제 출시 후 첫 게임 완료율, 두 번째 게임 시작률, 다음 날 재방문율을 관찰해 난이도와 안내를 조정해야 합니다. 자동 테스트는 게임 규칙, 블록 분배, 주요 버튼, 앱 전환, 작은 화면 및 가로 화면의 레이아웃을 검증합니다. 실기기 터치감과 장기 플레이 밸런스는 별도 플레이 검증이 필요합니다.

@@ -149,6 +149,7 @@ class SnowGameModel {
   }
 
   final math.Random _random = math.Random();
+  final List<String> _bag = [];
   late List<List<CubeCell?>> board;
   Piece? current;
   late String nextType;
@@ -172,6 +173,7 @@ class SnowGameModel {
       (_) => List<CubeCell?>.filled(boardCols, null),
     );
     current = null;
+    _bag.clear();
     nextType = _randomType();
     height = 0;
     pieces = 0;
@@ -266,6 +268,16 @@ class SnowGameModel {
     dropTimer = 0;
   }
 
+  int? get landingY {
+    final piece = current;
+    if (piece == null) return null;
+    var y = piece.y;
+    while (!_collides(piece, piece.x, y + 1, piece.shape)) {
+      y++;
+    }
+    return y;
+  }
+
   void hardDrop() {
     if (phase != GamePhase.playing || current == null) return;
     final piece = current!;
@@ -314,6 +326,9 @@ class SnowGameModel {
     pieces += 1;
     current = null;
     _freezeCompletedLines();
+    // A falling piece may have temporarily blocked a melting ice row.
+    _settleUnsupportedIceLines();
+    _trimAnchoredIceStack();
     _spawnPiece();
   }
 
@@ -474,8 +489,11 @@ class SnowGameModel {
   }
 
   String _randomType() {
-    final keys = tetrominoes.keys.toList(growable: false);
-    return keys[_random.nextInt(keys.length)];
+    if (_bag.isEmpty) {
+      _bag.addAll(tetrominoes.keys);
+      _bag.shuffle(_random);
+    }
+    return _bag.removeLast();
   }
 
   void _burst(double x, double y, Color color, int count) {
@@ -540,7 +558,9 @@ class SfxScope extends InheritedWidget {
   bool updateShouldNotify(covariant SfxScope oldWidget) => false;
 }
 
-class _SnowCubeScreenState extends State<SnowCubeScreen> {
+class _SnowCubeScreenState extends State<SnowCubeScreen>
+    with WidgetsBindingObserver {
+  bool pauseMenuOpen = false;
   final SnowGameModel game = SnowGameModel();
   final FocusNode focusNode = FocusNode();
   final GameAudioController audio = GameAudioController();
@@ -557,6 +577,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadImages();
     _loadBestScore();
     _loadBannerAd();
@@ -565,11 +586,23 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
     bannerAd?.dispose();
     unawaited(audio.dispose());
+    for (final image in images?.stages ?? <ui.Image>[]) {
+      image.dispose();
+    }
+    images?.ice.dispose();
     focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed && game.phase == GamePhase.playing) {
+      unawaited(_openPauseMenu());
+    }
   }
 
   Future<void> _loadBestScore() async {
@@ -578,7 +611,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
     if (!mounted) return;
     setState(() {
       savedBestIceLines = best;
-      game.bestHeight = best;
+      game.bestHeight = math.max(game.bestHeight, best);
     });
   }
 
@@ -618,6 +651,12 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
       _loadUiImage('assets/cubes/cube_crack_4.png'),
       _loadUiImage('assets/cubes/cube_frozen.png'),
     ]);
+    if (!mounted) {
+      for (final image in loaded) {
+        image.dispose();
+      }
+      return;
+    }
     setState(() {
       images = CubeImages(loaded.take(5).toList(), loaded.last);
     });
@@ -627,6 +666,7 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
     final data = await rootBundle.load(path);
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     final frame = await codec.getNextFrame();
+    codec.dispose();
     return frame.image;
   }
 
@@ -674,6 +714,8 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
   }
 
   Future<void> _openPauseMenu() async {
+    if (pauseMenuOpen || game.phase == GamePhase.title) return;
+    pauseMenuOpen = true;
     if (game.phase == GamePhase.playing) {
       setState(game.togglePause);
       unawaited(audio.pauseBgm());
@@ -703,9 +745,17 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
         },
       ),
     );
+    pauseMenuOpen = false;
+    if (!mounted) return;
+    if (game.phase == GamePhase.paused) {
+      setState(game.togglePause);
+      unawaited(audio.resumeBgm());
+    }
+    focusNode.requestFocus();
   }
 
   void _handleKey(KeyEvent event) {
+    if (pauseMenuOpen) return;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowLeft:
@@ -720,6 +770,12 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
       case LogicalKeyboardKey.arrowDown:
       case LogicalKeyboardKey.keyS:
         game.softDrop();
+      case LogicalKeyboardKey.space:
+        if (event is KeyDownEvent) game.hardDrop();
+      case LogicalKeyboardKey.keyZ:
+        if (event is KeyDownEvent) game.rotateLeft();
+      case LogicalKeyboardKey.keyX:
+        if (event is KeyDownEvent) game.flipHorizontal();
       case LogicalKeyboardKey.escape:
       case LogicalKeyboardKey.keyP:
         unawaited(_openPauseMenu());
@@ -763,14 +819,17 @@ class _SnowCubeScreenState extends State<SnowCubeScreen> {
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 980),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 66, 16, 12),
+                          padding: const EdgeInsets.all(12),
                           child: game.phase == GamePhase.title
-                              ? TitlePanel(onStart: _startGame)
+                              ? SingleChildScrollView(
+                                  child: TitlePanel(onStart: _startGame),
+                                )
                               : GamePanel(
                                   game: game,
                                   images: images,
                                   boardSize: boardSize,
                                   cell: cell,
+                                  onRestart: _startGame,
                                   onPause: () => unawaited(_openPauseMenu()),
                                 ),
                         ),
@@ -862,15 +921,16 @@ class TitlePanel extends StatelessWidget {
     // Adjust these values to tune the title start button.
     const startButtonWidth = 280.0;
     const startButtonHeight = 96.0;
-    const startButtonTopGap = 56.0;
+    const startButtonTopGap = 20.0;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Spacer(),
+        const SizedBox(height: 16),
         Image.asset(
           'assets/ui/logo_no_bg.png',
           width: MediaQuery.sizeOf(context).width < 520 ? 300 : 430,
+          height: MediaQuery.sizeOf(context).height * 0.32,
           fit: BoxFit.contain,
           filterQuality: FilterQuality.none,
           errorBuilder: (context, error, stackTrace) => Text(
@@ -890,13 +950,21 @@ class TitlePanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: startButtonTopGap),
+        const Text('녹기 전에 한 줄을 채워 얼음으로!', textAlign: TextAlign.center),
+        const Padding(
+          padding: EdgeInsets.all(12),
+          child: Text(
+            '눈은 27.5초 후 녹지만 얼음은 남아요.\n줄을 완성하며 최고 기록에 도전하세요.',
+            textAlign: TextAlign.center,
+          ),
+        ),
         ImageButton(
           assetPath: 'assets/ui/btn_game_start.png',
           width: startButtonWidth,
           height: startButtonHeight,
           onPressed: onStart,
         ),
-        const Spacer(),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -910,6 +978,7 @@ class GamePanel extends StatelessWidget {
     required this.boardSize,
     required this.cell,
     required this.onPause,
+    required this.onRestart,
   });
 
   final SnowGameModel game;
@@ -917,6 +986,7 @@ class GamePanel extends StatelessWidget {
   final Size boardSize;
   final double cell;
   final VoidCallback onPause;
+  final VoidCallback onRestart;
 
   @override
   Widget build(BuildContext context) {
@@ -978,7 +1048,48 @@ class GamePanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: iceHeaderBottomGap),
-            Expanded(child: Center(child: board)),
+            Text(
+              '최고 ${game.bestHeight} · 다음 목표 ${(game.iceLines ~/ 5 + 1) * 5}줄',
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('다음 '),
+                SizedBox(
+                  width: 48,
+                  height: 28,
+                  child: CustomPaint(painter: NextPiecePainter(game.nextType)),
+                ),
+              ],
+            ),
+            Expanded(
+              child: Center(
+                child: FittedBox(fit: BoxFit.contain, child: board),
+              ),
+            ),
+            if (game.phase == GamePhase.gameOver)
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  Text(
+                    '${game.iceLines}줄 · ${game.pieces}블록 · ${game.elapsed.toInt()}초',
+                  ),
+                  FilledButton(
+                    onPressed: onRestart,
+                    child: const Text('다시 도전'),
+                  ),
+                ],
+              )
+            else
+              TextButton.icon(
+                onPressed: game.phase == GamePhase.playing
+                    ? game.hardDrop
+                    : null,
+                icon: const Icon(Icons.vertical_align_bottom),
+                label: const Text('즉시 놓기 · Space'),
+              ),
             const SizedBox(height: controlsBoardGap),
             Transform.translate(
               offset: const Offset(controlsOffsetX, controlsOffsetY),
@@ -1050,6 +1161,26 @@ class BoardPainter extends CustomPainter {
 
     final piece = game.current;
     if (piece != null) {
+      final ghostY = game.landingY!;
+      final ghostPaint = Paint()
+        ..color = const Color(0xffbceaff).withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      for (var r = 0; r < piece.shape.length; r++) {
+        for (var c = 0; c < piece.shape[r].length; c++) {
+          if (piece.shape[r][c] != 0) {
+            canvas.drawRect(
+              Rect.fromLTWH(
+                (piece.x + c) * cell,
+                (ghostY + r) * cell,
+                cell,
+                cell,
+              ).deflate(2),
+              ghostPaint,
+            );
+          }
+        }
+      }
       for (var r = 0; r < piece.shape.length; r += 1) {
         for (var c = 0; c < piece.shape[r].length; c += 1) {
           if (piece.shape[r][c] == 0) continue;
@@ -1180,7 +1311,9 @@ class TouchControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Adjust these values to tune the touch control buttons.
-    const controlButtonSize = 80.0;
+    final controlButtonSize = MediaQuery.sizeOf(context).height < 650
+        ? 48.0
+        : 64.0;
     const controlButtonGap = 0.5;
     const controlRowGap = 0.5;
     const moveLeftScaleX = 1.50;
@@ -1327,77 +1460,18 @@ class PauseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screen = MediaQuery.sizeOf(context);
-
-    // Adjust these ratios to tune the pause modal layout.
-    final modalWidth = math.min(screen.width * 0.82, 320.0);
-    final modalHeight = modalWidth * 0.593;
-    final closeTop = modalHeight * 0.230;
-    final closeRight = modalWidth * 0.135;
-    final closeSize = modalWidth * 0.093;
-    final restartButtonWidth = modalWidth * 0.48;
-    final homeButtonWidth = modalWidth * 0.587;
-    final restartButtonHeight = modalHeight * 0.25;
-    final homeButtonHeight = modalHeight * 0.7;
-    final restartButtonLeft = (modalWidth - restartButtonWidth) / 2;
-    final homeButtonLeft = (modalWidth - homeButtonWidth) / 2;
-    final restartTop = modalHeight * 0.3;
-    final homeTop = modalHeight * 0.3;
-    const restartScaleY = 2.05;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      child: SizedBox(
-        width: modalWidth,
-        height: modalHeight,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: Image.asset(
-                'assets/ui/menu_modal.png',
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.none,
-              ),
-            ),
-            Positioned(
-              top: closeTop,
-              right: closeRight,
-              child: ImageButton(
-                assetPath: 'assets/ui/btn_close_menu.png',
-                fit: BoxFit.fill,
-                width: closeSize,
-                height: closeSize,
-                onPressed: onResume,
-              ),
-            ),
-            Positioned(
-              left: restartButtonLeft,
-              top: restartTop,
-              child: ImageButton(
-                assetPath: 'assets/ui/btn_restart.png',
-                fit: BoxFit.fill,
-                width: restartButtonWidth,
-                height: restartButtonHeight,
-                scaleY: restartScaleY,
-                onPressed: onRestart,
-              ),
-            ),
-            Positioned(
-              left: homeButtonLeft,
-              top: homeTop,
-              child: ImageButton(
-                assetPath: 'assets/ui/btn_home.png',
-                fit: BoxFit.fill,
-                width: homeButtonWidth,
-                height: homeButtonHeight,
-                onPressed: onHome,
-              ),
-            ),
-          ],
+    return AlertDialog(
+      title: const Text('잠깐 쉬어가기'),
+      content: const SingleChildScrollView(
+        child: Text(
+          '← → / A D : 이동\n↑ / W : 회전 · Z : 반대 회전\nX : 좌우 뒤집기\n↓ / S : 내리기 · Space : 즉시 놓기\n\n눈이 녹기 전에 가로 한 줄을 채우세요.',
         ),
       ),
+      actions: [
+        TextButton(onPressed: onHome, child: const Text('처음으로')),
+        TextButton(onPressed: onRestart, child: const Text('새 게임')),
+        FilledButton(onPressed: onResume, child: const Text('계속하기')),
+      ],
     );
   }
 }
@@ -1464,4 +1538,29 @@ class SquareIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class NextPiecePainter extends CustomPainter {
+  NextPiecePainter(this.type);
+  final String type;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shape = tetrominoes[type]!;
+    const cell = 10.0;
+    final dx = (size.width - shape.first.length * cell) / 2;
+    final dy = (size.height - shape.length * cell) / 2;
+    for (var r = 0; r < shape.length; r++) {
+      for (var c = 0; c < shape[r].length; c++) {
+        if (shape[r][c] == 1) {
+          canvas.drawRect(
+            Rect.fromLTWH(dx + c * cell, dy + r * cell, cell - 1, cell - 1),
+            Paint()..color = const Color(0xffdff4ff),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(NextPiecePainter oldDelegate) => oldDelegate.type != type;
 }
